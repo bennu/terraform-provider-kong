@@ -19,19 +19,19 @@ func resourceKongAPI() *schema.Resource {
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
+				ForceNew: false,
 			},
 
 			"uris": {
 				Type:     schema.TypeList,
 				Required: true,
-				ForceNew: true,
+				ForceNew: false,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
 			"upstream_url": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
+				ForceNew: false,
 			},
 		},
 	}
@@ -72,8 +72,35 @@ func resourceKongAPIRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceKongAPIDelete(d *schema.ResourceData, meta interface{}) error {
+	client := meta.(*client.Client)
+
+	if err := client.APIDelete(context.Background(), d.Id()); err != nil {
+		return err
+	}
 	return nil
 }
+
 func resourceKongAPIUpdate(d *schema.ResourceData, meta interface{}) error {
-	return nil
+	client := meta.(*client.Client)
+	req := types.APIUpdate{}
+
+	if v, ok := d.GetOk("uris"); ok {
+		var uris []string
+		for _, tag := range v.([]interface{}) {
+			uris = append(uris, tag.(string))
+		}
+		req.URIS = uris
+	}
+	req.UpstreamURL = d.Get("upstream_url").(string)
+	req.Name = d.Get("name").(string)
+
+
+	api, err := client.APIUpdate(context.Background(), d.Id(), req)
+	if err != nil {
+		return fmt.Errorf("Error creating API: %s", err)
+	}
+
+	d.SetId(api.Id)
+
+	return resourceKongAPIRead(d, meta)
 }
